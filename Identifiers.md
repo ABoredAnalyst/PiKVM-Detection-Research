@@ -38,14 +38,18 @@ HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY\<identifier>\<instance>\Device Parame
 
 The value named `EDID` under that key holds the raw binary block the display supplied. The identifier in the key name is the manufacturer prefix and product code concatenated, so the values in the display table below are visible from key names alone, and the block itself carries the monitor name and serial.
 
-| PNP ID  | Vendor prefix      | SerialNumberID | Associated with                     |
+| PNP ID  | Vendor prefix      | Serial          | Associated with                     |
 | ------- | ------------------ | -------------- | ----------------------------------- |
 | LNX777* | LNX (Linux)        | CAFEBABE       | PiKVM                               |
 | TSB9876 | TSB (Toshiba)      | 2290649088     | TinyPilot                           |
 | GLIC21C | GLI (GL.iNet)      | 891247         | GL.iNet Comet                       |
 | TSB8801 | TSB (Toshiba)      | 2290649088     | JetKVM                              |
 | VCS1145 | VCS (ViewSonic)    | 4527409        | NanoKVM                             |
+| SPD3301 | SPD (Sipeed?)      | 21             | NanoKVM                             |
 | HJW0001 | HJW (unregistered) | 1              | Openterface **and** BliKVM (shared) |
+
+The first NanoKVM entry was the default EDID listed in the [Be KVM, Do Fraud](https://blog.grumpygoose.io/be-kvm-do-fraud-8ab523d26c9d) article, which was on app version 2.2.0 and 2.2.9.  
+The second entry is from my own NanoKVM Cube, which provided separate identifiers on app version 2.5.2.
 
 ### GL.iNet Comet Alternate EDID Identifiers
 
@@ -53,7 +57,7 @@ The GL.iNet Comet device comes with multiple built-in display profiles to make t
 These were pulled directly from the Comet GL-RM1 v1.10.0. I am unaware if these same profiles apply to all models of the device.
 
 
-| Display Profile          | PnP ID (full) | Product ID | Monitor name | Serial string   | Manufacture Date | Audio (LPCM 2ch) | EDID (base64)                                                                                                                                                                                                                                                                                                                                              |
+| Display Profile          | PnP ID (full) | Product ID | Monitor name | Serial           | Manufacture Date | Audio (LPCM 2ch) | EDID (base64)                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | ------------- | ---------- | ------------ | --------------- | ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2560x1440/GLKVM/60Hz     | `GLIC21C`     | `C21C`     | `GLKVM`      | `891247`        | wk8/2021         | 32/44.1/48 kHz   | `AP///////wAdiRzCig4AAAgfAQOAPCJ4Ki1xr09EqScNUFQhCADRwJXAlQCBgIFAgcABAQEBVl4AoKCgKVAwIDUAVVAhAAAeAAAA/wA4OTEyNDcKICAgICAgAAAA/ABHTEtWTQogICAgICAgAAAA/QAwSx5yHgAKICAgICAgAV0CAyfwSxAfBRQEEwMSAhEBIwkHB4MBAABlAwwAEABoGgAAAQEwSwACOoAYcTgtQFgsRQBVUCEAAB6MCtCKIOAtEBA+lgBVUCEAABiMCtCQIEAxIAxAVQBVUCEAABjwPADQUaA1UGCIOgBVUCEAABwAAAAAAAAAAAAAAAAAAAAArg==` |
 | 3840x2160/GLKVM/30Hz     | `GLIC21C`     | `C21C`     | `GLKVM`      | none            | wk9/2021         | 44.1/48 kHz      | `AP///////wAdiRzC3JMAAAkfAQOAMh94B+6Vo1RMmSYPUFQAAAABAQEBAQEBAQEBAQEBAQEBtGYAoPBwH4AwIDUAY8gQAAAaAAAA/QAX8A//GgAKICAgICAgAAAA/ABHTEtWTQogICAgICAgAAAAAAAAAAAAAAAAAAAAAAAAAV4CAxhAIwkGB2cDDAAAABA1Z9hdxAE1gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmQ==` |
