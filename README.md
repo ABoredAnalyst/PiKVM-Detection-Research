@@ -108,19 +108,25 @@ Two warnings when forming your detection logic. Like I previously mentioned, whe
 This means if using the registry as your reference, you will need to cross-reference the device with its `Enum\HID` entry to verify exactly what it is and make sure you are looking at a mouse and keyboard and not a mouse and keypad instead. The easiest way to do this if making queries against USB telemetry is to reference the ClassGUID of the device directly.
 
 Below is a list of all the USB devices observed in the registry as a reference for potential detection logic.
+| Device               | ClassGUID                                                         | RegistryLocation | Service   | DeviceDesc                    |
+| -------------------- | ----------------------------------------------------------------- | ---------------- | --------- | ----------------------------- |
+| Composite Device<br> | {36fc9e60-c465-11cf-8056-444553540000} ***                        | Enum\USB         | usbccgp   | USB Composite Device          |
+| Mouse                | {4d36e96f-e325-11ce-bfc1-08002be10318}                            | Enum\HID         | mouhid    | HID-compliant mouse           |
+| Keyboard             | {4d36e96b-e325-11ce-bfc1-08002be10318}                            | Enum\HID         | kbdhid    | HID Keyboard Device           |
+| Mass Storage         | {36fc9e60-c465-11cf-8056-444553540000} (same as composite device) | Enum\USB         | USBSTOR   | USB Mass Storage Device       |
+| Webcam               | {ca3e7ab9-b4c3-4ae6-8251-579ef933890f}                            | Enum\USB         | usbvideo  | UVC Camera                    |
+| Audio                | {4d36e96c-e325-11ce-bfc1-08002be10318}                            | Enum\USB         | usbaudio2 | USB Audio 2.0                 |
+| Network (RNDIS)      | {4d36e972-e325-11ce-bfc1-08002be10318}                            | Enum\USB         | usbrndis6 | Remote NDIS Compatible Device |
 
-| Device               | ClassGUID                                                         | RegistryLocation | Service   | DeviceDesc              |
-| -------------------- | ----------------------------------------------------------------- | ---------------- | --------- | ----------------------- |
-| Composite Device<br> | {36fc9e60-c465-11cf-8056-444553540000} ***                        | Enum\USB         | usbccgp   | USB Composite Device    |
-| Mouse                | {4d36e96f-e325-11ce-bfc1-08002be10318}                            | Enum\HID         | mouhid    | HID-compliant mouse     |
-| Keyboard             | {4d36e96b-e325-11ce-bfc1-08002be10318}                            | Enum\HID         | kbdhid    | HID Keyboard Device     |
-| Mass Storage         | {36fc9e60-c465-11cf-8056-444553540000} (same as composite device) | Enum\USB         | USBSTOR   | USB Mass Storage Device |
-| Webcam               | {ca3e7ab9-b4c3-4ae6-8251-579ef933890f}                            | Enum\USB         | usbvideo  | UVC Camera              |
-| Audio                | {4d36e96c-e325-11ce-bfc1-08002be10318}                            | Enum\USB         | usbaudio2 | USB Audio 2.0           |
+The RNDIS entry is definitely one to look out for as this was specifically seen enabled by default on the NanoKVM Cube.
 
-Second warning is that the ClassGUID for a **composite device** technically belongs to the USB Controllers category, meaning that it can also be associated with generic USB hubs. This is easy to catch when doing manual reviews of the device via the registry since you can reference the DeviceDesc or Service, but can make using this logic via USB telemetry tricky depending on your SIEM.
+My second warning is that the ClassGUID for a **composite device** technically belongs to the USB Controllers category, meaning that it can also be associated with generic USB hubs. This is easy to catch when doing manual reviews of the device via the registry since you can reference the DeviceDesc or Service, but can make using this logic via USB telemetry tricky depending on your SIEM as some may not expose that information.
 
-Unfortunately, this detection logic isn't perfect because it relies on the fact that the operator uses at least one non-HID device, which is not always guaranteed since the device only requires the use of a mouse and keyboard to function. But at a minimum, it is worth having an individual check for due to the fact that these operators tend to be using PiKVMs for remote work schemes. Remote work typically means attending virtual meetings. If they don't plan to use a webcam or headset through the connection, they would either need to have a proxy stand in for them on the physical machine, or log into their accounts on a separate device, defeating the purpose of the PiKVM and likely triggering conditional access policies.
+As an example of how this could be achieved, I have provided my own query titled "M/K plus Non-Input USB Detection" for Cortex XDR.
+
+Unfortunately, this detection logic isn't perfect because it relies on the fact that the operator uses at least one non-HID device. It is a likely occurrence due to the fact that devices like the PiKVM come with media storage enabled by default unless explicitly disabled, and the NanoKVM also comes with media storage and the RNDIS adapter enabled. But it is not guaranteed since the operators can just as easily disable these functions before hand.
+
+At a minimum, it is still worth having an individual check for due to the chance of catching a default device, and also the fact that these operators tend to be using these devices for remote work schemes. Remote work typically means attending virtual meetings. If they don't plan to use a webcam or headset through the connection, they would either need to have a proxy stand in for them on the physical machine, or log into their accounts on a separate device, defeating the purpose of the PiKVM and likely triggering conditional access policies.
 
 But let's say they do have a proxy standing in for them and there is no chance they will ever be seen using anything besides the mouse and keyboard. This logic is busted, but our next one might make up for it.
 
@@ -147,9 +153,9 @@ We'll discuss the specifics of these mouse modes and how they function in the ne
 Here is a list of all of the device this method is believed to work against:
 - PiKVM (confirmed via testing)
 - GL.iNet (confirmed via testing)
+- NanoKVM Cube/Lite/Full (confirmed via testing)
 - JetKVM (inferred via documentation)
 - BliKVM (inferred via documentation)
-- NanoKVM Cube/Lite/Full (inferred via documentation)(awaiting testing)
 
 Since we are going off of device presence instead of looking for identifiers, this means that it is possible to detect any of these devices even after obfuscation with zero additional peripherals (webcam, mass storage, audio) by simply looking for a composite device that has two mice and a keyboard associated with it. 
 
