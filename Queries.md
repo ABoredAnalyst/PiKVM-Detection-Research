@@ -1,6 +1,6 @@
  # Queries
 
-The following queries are specific to Cortex XDR/XSIAM, but should be able to be converted to the SIEM of your choosing. If not, you should be able to at least use the theory within them for own detections.
+The following queries are specific to Cortex XDR/XSIAM, but should be able to be converted to the SIEM of your choosing. If not, you should be able to at least use the logic within them for your own detections.
 
 ## Two Mice, One Keyboard
 
@@ -174,4 +174,85 @@ $hits = $nodes | Group-Object Container | ForEach-Object {
 }
 
 if ($hits) { $hits } else { Write-Host 'No composite device matched keyboard + mouse + storage/webcam/audio/network' -ForegroundColor Yellow }
+```
+
+## IOC Sweep
+
+The following query covers all of the identifiers seen within default configs on multiple KVM-over-IP devices, including alternate profiles observed on some devices like the GL.iNet Comet.
+It uses USB device telemetry for USB identifiers and registry for the storage devices and displays. Recommend running as a scheduled query due to the comp output.
+
+```
+// Fleet-wide hunt for stock and spoofed identities - USB gadget IDs, virtual-display (EDID) PNP IDs and virtual-drive strings for PiKVM, GL.iNet Comet, TinyPilot, JetKVM, BliKVM, NanoKVM and Openterface
+config timeframe = 30d
+| dataset = xdr_data
+| filter event_type in (ENUM.DEVICE, ENUM.REGISTRY)
+| filter
+    // ---- USB gadget identities ----
+    (event_type = ENUM.DEVICE
+      and (
+           action_device_usb_serial_number in ("CAFEBABE", "6b65796d696d6570690", "2019B152ED98")
+        or action_device_usb_vendor_id = 14571
+        or (action_device_usb_vendor_id = 7531 and action_device_usb_product_id = 260)
+        or (action_device_usb_vendor_id = 7531 and action_device_usb_product_id = 262)
+        or (action_device_usb_vendor_id = 13126 and action_device_usb_product_id = 4105)
+        or (action_device_usb_vendor_id = 6790 and action_device_usb_product_id = 58153)
+           // Comet built-in profiles (real vendor IDs)
+        or (action_device_usb_vendor_id = 26944 and action_device_usb_product_id = 26995)
+        or (action_device_usb_vendor_id = 16700 and action_device_usb_product_id = 8209)
+        or (action_device_usb_vendor_id = 1118 and action_device_usb_product_id = 95)
+        or (action_device_usb_vendor_id = 1133 and action_device_usb_product_id = 50470)
+      ))
+    // ---- virtual display and virtual drive, from registry key names ----
+ or (event_type = ENUM.REGISTRY
+      and (
+           action_registry_key_name ~= "(?i)Enum.DISPLAY.(LNX777[0-9A-Z]|TSB9876|TSB8801|TSB8888|GLIC21C|VCS1145|SPD3301|HJW0001)"
+        or action_registry_key_name ~= "(?i)Enum.DISPLAY.(AOC3202|AUS24B2|SECA70B|LG@0000|HP@0000|VSC2F34|AOC2577|LTM3132|AOC3525|AOC2963|AOCA522|CHR7511|AOC2001|ACR0565|AUS2487|DEL2013)"
+        or action_registry_key_name ~= "(?i)Enum.USBSTOR.[A-Za-z]+&Ven_(NanoKVM|PiKVM)"
+        or action_registry_key_name ~= "(?i)Enum.USBSTOR.[A-Za-z]+&Ven_Linux&Prod_File-"
+      ))
+| alter
+    Indicator_Class = if(event_type = ENUM.DEVICE, "USB gadget identity",
+                         action_registry_key_name ~= "(?i)Enum.USBSTOR", "Virtual drive string",
+                         "Virtual display (EDID) identity"),
+    Display_ID = if(action_registry_key_name ~= "(?i)Enum.DISPLAY",
+        arrayindex(regextract(action_registry_key_name, "(?i)Enum.DISPLAY.([A-Za-z0-9_@]+)"), 0), null),
+    Virtual_Drive = if(action_registry_key_name ~= "(?i)Enum.USBSTOR",
+        arrayindex(regextract(action_registry_key_name, "(?i)Enum.USBSTOR.([A-Za-z0-9_&-]+)"), 0), null),
+    Suspected_Product = if(
+        action_device_usb_vendor_id = 14571, "GL.iNet Comet",
+        action_device_usb_vendor_id = 13126, "Sipeed NanoKVM",
+        action_device_usb_vendor_id = 6790, "Openterface",
+        action_device_usb_vendor_id = 7531 and action_device_usb_product_id = 262, "BliKVM",
+        action_device_usb_vendor_id = 26944, "GL.iNet profile (Corsair)",
+        action_device_usb_vendor_id = 16700 and action_device_usb_product_id = 8209, "GL.iNet profile (Dell keyboard)",
+        action_device_usb_vendor_id = 1118, "GL.iNet profile (Microsoft keyboard)",
+        action_device_usb_vendor_id = 1133, "GL.iNet profile (Logitech receiver)",
+        action_device_usb_serial_number = "6b65796d696d6570690", "TinyPilot / BliKVM",
+        action_device_usb_serial_number = "2019B152ED98", "Openterface",
+        action_device_usb_serial_number = "CAFEBABE", "PiKVM / GL.iNet / JetKVM)",
+        action_device_usb_vendor_id = 7531, "PiKVM / TinyPilot / JetKVM / GL.iNet (Linux gadget default)",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.LNX777", "PiKVM",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.TSB9876", "TinyPilot",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.TSB8801", "JetKVM",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.GLIC21C", "GL.iNet",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.(VCS1145|SPD3301)", "Sipeed NanoKVM",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.HJW0001", "Openterface / BliKVM",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.TSB8888", "PiKVM example EDID (V1-V3, PI-KVM Video)",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY.(ACR0565|AUS2487|DEL2013)", "PiKVM example EDID (V4, monitor copy)",
+        action_registry_key_name ~= "(?i)Enum.DISPLAY", "GL.iNet",
+        action_registry_key_name ~= "(?i)Ven_NanoKVM", "Sipeed NanoKVM",
+        action_registry_key_name ~= "(?i)Ven_PiKVM", "PiKVM",
+        action_registry_key_name ~= "(?i)Ven_Linux", "Linux gadget default (GL.iNet)",
+        "Unattributed")
+| comp
+    count() as Events,
+    count_distinct(action_device_class_guid) as Setup_Classes
+  by agent_hostname, Suspected_Product, Indicator_Class, Display_ID, Virtual_Drive,
+     action_device_usb_vendor_id, action_device_usb_product_id, action_device_usb_serial_number
+
+// The query comps all events by class GUID to reduce noise, showing you entries by individual device (USB gadget, display, media storage)
+// If you wish to see each individual entry, uncomment the fields below. It will be noisy though due to multiple entries per device via 
+// plugins, registry keys, etc.
+//|fields agent_hostname, Suspected_Product, Indicator_Class, Display_ID, Virtual_Drive,
+     // action_device_usb_vendor_id, action_device_usb_product_id, action_device_usb_serial_number
 ```
